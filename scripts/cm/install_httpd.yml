@@ -1,0 +1,52 @@
+---
+- name: Install and configure Apache HTTPD
+  hosts: webservers
+  become: true
+  tasks:
+
+    - name: Ensure httpd package is installed
+      ansible.builtin.package:
+        name: httpd
+        state: present
+
+    - name: Deploy custom index page
+      ansible.builtin.copy:
+        content: "<h1>Managed by Ansible</h1>"
+        dest: /var/www/html/index.html
+        owner: apache
+        group: apache
+        mode: '0644'
+
+    - name: Ensure firewalld service is running (if installed)
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: true
+      ignore_errors: true
+
+    - name: Open HTTP and HTTPS ports in firewall
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - http
+        - https
+      ignore_errors: true
+
+    - name: Ensure httpd service is started and enabled
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: true
+
+    - name: Verify httpd is responding locally
+      ansible.builtin.uri:
+        url: http://localhost
+        status_code: 200
+      register: result
+
+    - name: Display health status
+      ansible.builtin.debug:
+        msg: "HTTPD is up and running! (Status: {{ result.status }})"
